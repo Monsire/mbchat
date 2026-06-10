@@ -1,0 +1,13 @@
+{
+  "name": "chatbubble",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "kick-live-connector": "^1.0.0",
+    "ws": "^8.21.0"
+  }
+}

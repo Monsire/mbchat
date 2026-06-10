@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MB Chat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400..800&family=Playfair+Display:ital,wght@0,500..700;1,500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="panel" aria-label="Chatbubble">
+        <section class="setup">
+          <header class="brand">
+            <div>
+              <h1>MB Chat</h1>
+              <div class="brand-links">
+                <a class="chat-page-link" href="/chat" target="_blank" rel="noreferrer">Open chat page</a>
+                <a class="chat-page-link" href="/obschat" target="_blank" rel="noreferrer">Open stream display (OBS)</a>
+                <a class="chat-page-link" href="/watch" target="_blank" rel="noreferrer">Open watch page</a>
+              </div>
+            </div>
+          </header>
+
+          <div class="spotlight-banner" id="spotlight-banner" hidden></div>
+
+          <div class="admin-sections" id="admin-sections">
+            <section class="admin-section" data-section="poll">
+              <header class="admin-section-head" draggable="true">
+                <span class="drag-handle" aria-hidden="true">&#x2839;&#x2839;</span>
+                <span class="admin-section-title">Poll</span>
+                <span class="section-chevron" aria-hidden="true">&#x25BE;</span>
+              </header>
+              <div class="admin-section-body">
+                <section class="poll-admin" id="poll-admin" aria-label="Cross-chat poll"></section>
+              </div>
+            </section>
+
+            <section class="admin-section" data-section="sources">
+              <header class="admin-section-head" draggable="true">
+                <span class="drag-handle" aria-hidden="true">&#x2839;&#x2839;</span>
+                <span class="admin-section-title">Sources</span>
+                <span class="sources-total" id="sources-total"></span>
+                <span class="section-chevron" aria-hidden="true">&#x25BE;</span>
+              </header>
+              <div class="admin-section-body">
+                <form class="sources" id="source-form">
+                  <section class="source-list" id="source-list" aria-label="Chat sources"></section>
+                </form>
+              </div>
+            </section>
+
+            <section class="admin-section" data-section="display">
+              <header class="admin-section-head" draggable="true">
+                <span class="drag-handle" aria-hidden="true">&#x2839;&#x2839;</span>
+                <span class="admin-section-title">Stream display</span>
+                <span class="section-chevron" aria-hidden="true">&#x25BE;</span>
+              </header>
+              <div class="admin-section-body">
+                <section class="obs-style-admin" id="obs-style-admin" aria-label="Stream display style"></section>
+              </div>
+            </section>
+          </div>
+
+        </section>
+
+        <section class="chat-surface" aria-label="Combined chat">
+          <header class="chat-header">
+            <span>Chat</span>
+          </header>
+          <section class="feed" id="feed" aria-live="polite"></section>
+          <aside class="user-info-panel" id="user-info-panel" hidden></aside>
+          <button class="resume-scroll" id="resume-scroll" type="button" hidden>Resume</button>
+        </section>
+      </section>
+    </main>
+
+    <script src="./poll-widget.js"></script>
+    <script src="./script.js"></script>
+  </body>
+</html>

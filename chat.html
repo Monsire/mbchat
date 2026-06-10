@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MB Chat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400..800&family=Playfair+Display:ital,wght@0,500..700;1,500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="chat-only-body">
+    <main class="chat-page" aria-label="Chatbubble chat">
+      <section class="chat-surface chat-page-surface">
+        <header class="chat-header">
+          <span>Chat</span>
+        </header>
+        <div class="poll-overlay" id="poll-widget" hidden></div>
+        <section class="feed" id="feed" aria-live="polite"></section>
+        <aside class="user-info-panel" id="user-info-panel" hidden></aside>
+        <button class="resume-scroll" id="resume-scroll" type="button" hidden>Resume</button>
+      </section>
+    </main>
+
+    <script src="./poll-widget.js"></script>
+    <script src="./chat.js"></script>
+  </body>
+</html>

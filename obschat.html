@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chatbubble Stream Display</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400..800&family=Playfair+Display:ital,wght@0,500..700;1,500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="obs-body">
+    <main class="obs-page" aria-label="Stream display">
+      <div class="obs-poll" id="poll-widget" hidden></div>
+      <section class="obs-spotlight" id="spotlight-panel" hidden></section>
+      <section class="obs-chat-panel" id="obs-chat-panel">
+        <header class="obs-chat-bar" id="obs-chat-bar">Chat</header>
+        <section class="feed obs-feed" id="feed" aria-live="polite"></section>
+      </section>
+    </main>
+
+    <script src="./poll-widget.js"></script>
+    <script src="./obschat.js"></script>
+  </body>
+</html>
