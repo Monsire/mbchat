@@ -4,7 +4,7 @@
 
 mbchat is a self-hosted livestream chat aggregator: it merges live chat from **Twitch**, **Kick**, **YouTube**, and **X** into a single real-time feed, runs **cross-platform polls** that viewers vote on by just typing in their own chat, and ships an **OBS-ready stream overlay** whose look is controlled live from an admin panel.
 
-<!-- visual: hero shot — admin panel with combined feed flowing on the right -->
+![Admin panel](docs/admin-dash.png)
 
 | Route | What it is |
 |---|---|
@@ -19,6 +19,8 @@ npm start
 # http://localhost:4173
 ```
 
+![Watch page](docs/simple-site.png)
+
 ---
 
 ## 1. Cross-platform chat
@@ -32,7 +34,7 @@ Four platforms, one feed, in real time:
 
 Every source shows a live connection state and its own **viewer count**, with a combined total across all platforms in the header. Messages carry their platform's icon so you always know where a message came from. Connections self-heal — drops reconnect automatically.
 
-<!-- visual: sources list with connected states + per-source viewer counts + total -->
+![Combined chat on stream](docs/stream-chat.png)
 
 ## 2. Cross-chat polls
 
@@ -44,7 +46,9 @@ Start a poll from the admin panel and **every connected chat votes together**:
 - Optional countdown timer with a draining time track
 - The poll renders everywhere at once: admin panel, public chat page, and the OBS overlay
 
-<!-- visual: poll running on the OBS display, bars + pie modes -->
+![Poll results as a pie chart](docs/piechart.png)
+
+![Poll and chat on stream](docs/stream-chat-poll.png)
 
 ## 3. Chat logs
 
@@ -54,7 +58,7 @@ Every message is kept per user (up to 5,000 per source, in memory):
 - Click another message while a log is open to jump straight to that user
 - Logs power the spotlight feature — pin a user's history on stream
 
-<!-- visual: user log view inside the popup -->
+![Viewer spotlight](docs/spotlight.png)
 
 ## 4. User info
 
@@ -65,7 +69,7 @@ Click a chatter and get a clean popup card right where you clicked:
 - The clicked message, quick access to their logs, and a **Spotlight** button
 - **Viewer spotlight**: pin a user and their message history on the stream overlay — the admin panel shows exactly what viewers see, and when the streamer scrolls the spotlight, **viewers' view scrolls in sync**
 
-<!-- visual: user popup with avatar + badges; spotlight live on stream -->
+![User info popup](docs/userinfo.png)
 
 ## 5. Tags & chat coloring
 
@@ -75,7 +79,7 @@ Make a busy multi-channel feed readable at a glance:
 - Per-source **username colors** via a custom color picker
 - Platform events — **subs, gift subs, super chats, memberships, bits** — render as styled event cards with uppercase tags, separated from regular chat
 
-<!-- visual: feed with labeled sources, colored usernames, and a sub event card -->
+![Source tags and username colors](docs/tags-color.png)
 
 ## 6. OBS integration
 
@@ -86,7 +90,7 @@ Make a busy multi-channel feed readable at a glance:
 - Chat title bar with an on/off toggle
 - Every styling change made in the admin panel **pushes to OBS live** — no refresh needed
 
-<!-- visual: OBS scene with the overlay framed on stream -->
+![Compact chat overlay](docs/stream-small-chat.png)
 
 ## 7. Customisability
 
@@ -97,7 +101,7 @@ The whole stream display is styled from the admin panel, live:
 - Background mode, chat on/off, title bar on/off
 - The admin panel itself is rearrangeable: every section **drags to reorder and collapses**, and your layout is remembered
 
-<!-- visual: stream display settings + the same overlay shown in two different styles -->
+![Stream display customisation](docs/customisation.png)
 
 ---
 
