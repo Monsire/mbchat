@@ -38,7 +38,19 @@ Every source shows a live connection state and its own **viewer count**, with a 
 
 ![Combined chat on stream](docs/stream-chat.png)
 
-## 2. Cross-chat polls
+## 2. User info & chat logs
+
+Click a chatter and get a clean popup card right where you clicked:
+
+- **Profile picture** (resolved live from Twitch/Kick), display name linking to their channel
+- Their **platform badges as real badge art** — subscriber, moderator, founder, etc.
+- The clicked message, quick access to their logs, and a **Spotlight** button
+- Every message is kept per user (up to 5,000 per source, in memory) — open any user's **full message history**, timestamped, oldest to newest
+- Click another message while a log is open to jump straight to that user
+
+![User info popup](docs/userinfo.gif)
+
+## 3. Cross-chat polls
 
 Start a poll from the admin panel and **every connected chat votes together**:
 
@@ -50,25 +62,7 @@ Start a poll from the admin panel and **every connected chat votes together**:
 
 ![Poll results as a pie chart](docs/piechart.png)
 
-## 3. Chat logs
-
-Every message is kept per user (up to 5,000 per source, in memory):
-
-- Click any message to open that user's **full message history**, timestamped, oldest to newest
-- Click another message while a log is open to jump straight to that user
-- Logs power the spotlight feature — pin a user's history on stream
-
-## 4. User info
-
-Click a chatter and get a clean popup card right where you clicked:
-
-- **Profile picture** (resolved live from Twitch/Kick), display name linking to their channel
-- Their **platform badges as real badge art** — subscriber, moderator, founder, etc.
-- The clicked message, quick access to their logs, and a **Spotlight** button
-
-![User info popup](docs/userinfo.gif)
-
-## 5. Viewer spotlight
+## 4. Viewer spotlight
 
 Put a chatter on stream with one click:
 
@@ -79,7 +73,7 @@ Put a chatter on stream with one click:
 
 ![Viewer spotlight](docs/spotlight.png)
 
-## 6. Tags & chat coloring
+## 5. Tags & chat coloring
 
 Make a busy multi-channel feed readable at a glance:
 
@@ -89,7 +83,7 @@ Make a busy multi-channel feed readable at a glance:
 
 ![Source tags and username colors](docs/tags-color.png)
 
-## 7. OBS integration
+## 6. OBS integration
 
 `/obschat` is built to be dropped into OBS as a browser source:
 
@@ -100,7 +94,7 @@ Make a busy multi-channel feed readable at a glance:
 
 ![Compact chat overlay](docs/stream-small-chat.png)
 
-## 8. Customisability
+## 7. Customisability
 
 The whole stream display is styled from the admin panel, live:
 
