@@ -1,3 +1,5 @@
+![mbchat](docs/stream-chat-poll.png)
+
 # mbchat
 
 **One chat for every platform you stream on.**
@@ -47,8 +49,6 @@ Start a poll from the admin panel and **every connected chat votes together**:
 - The poll renders everywhere at once: admin panel, public chat page, and the OBS overlay
 
 ![Poll results as a pie chart](docs/piechart.png)
-
-![Poll and chat on stream](docs/stream-chat-poll.png)
 
 ## 3. Chat logs
 
