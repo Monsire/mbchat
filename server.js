@@ -251,6 +251,10 @@ function applyObsStyle(patch = {}) {
 
 function emitMessage(message) {
   const sourceId = message.sourceId || message.platform;
+  // Connectors can keep emitting briefly while they tear down — drop
+  // anything from a source that's no longer active so a closed chat
+  // never leaks messages into the feed.
+  if (!activeSources.has(sourceId)) return;
   const normalized = {
     id: message.id || `${sourceId}:${Date.now()}:${Math.random().toString(36).slice(2)}`,
     sourceId,
@@ -1322,11 +1326,18 @@ function parseXChatFrame(frame) {
   const text = typeof inner?.body === "string" ? inner.body.trim() : "";
   if (!text) return null;
 
+  // X stamps messages in mixed units (seconds, ms, µs, or ns depending on
+  // the sender's client) — normalize everything to milliseconds, otherwise
+  // seconds-stamped messages read as 1970 and get dropped as backfill.
   let createdAt = Number(inner?.timestamp);
   if (!Number.isFinite(createdAt) || createdAt <= 0) {
     createdAt = inner?.programDateTime ? Date.parse(inner.programDateTime) : Date.now();
-  } else if (createdAt > 1e14) {
+  } else if (createdAt > 1e17) {
     createdAt = Math.floor(createdAt / 1e6);
+  } else if (createdAt > 1e14) {
+    createdAt = Math.floor(createdAt / 1e3);
+  } else if (createdAt < 1e11) {
+    createdAt = Math.floor(createdAt * 1000);
   }
 
   const username = inner?.username || outer?.sender?.username || "";
@@ -1426,6 +1437,15 @@ class XConnector {
     const bootstrap = await bootstrapXBroadcastChat(this.broadcastId);
     if (this.closed) return;
 
+    // The chatman socket only pushes a sampled trickle of chat on busy
+    // broadcasts — poll the history endpoint as well and dedupe, so the
+    // feed gets the full stream.
+    this.chatEndpoint = bootstrap.endpoint;
+    this.chatAccessToken = bootstrap.accessToken;
+    this.seenChatIds = this.seenChatIds || new Set();
+    clearInterval(this.historyTimer);
+    this.historyTimer = setInterval(() => this.pollHistory(), 4000);
+
     const wsUrl = `${bootstrap.endpoint.replace(/^http/, "ws").replace(/\/$/, "")}/chatapi/v1/chatnow`;
     const ws = new WebSocket(wsUrl, {
       headers: { origin: "https://x.com", "user-agent": browserHeaders()["user-agent"] },
@@ -1451,6 +1471,7 @@ class XConnector {
       const message = parseXChatFrame(frame);
       if (!message) return;
       if (message.createdAt < this.startedAt - LIVE_BACKFILL_WINDOW_MS) return;
+      this.rememberChatId(message);
       emitMessage({ ...message, sourceId: this.sourceId, platform: "x" });
     });
 
@@ -1459,6 +1480,46 @@ class XConnector {
       if (this.ws === ws) this.ws = null;
       if (!this.closed) this.scheduleReconnect();
     });
+  }
+
+  chatIdKey(message) {
+    return message.id || `${message.author}:${message.text}:${Math.floor(message.createdAt / 2000)}`;
+  }
+
+  rememberChatId(message) {
+    this.seenChatIds = this.seenChatIds || new Set();
+    this.seenChatIds.add(this.chatIdKey(message));
+    if (this.seenChatIds.size > 4000) {
+      this.seenChatIds = new Set(Array.from(this.seenChatIds).slice(-2000));
+    }
+  }
+
+  async pollHistory() {
+    if (this.closed || !this.chatEndpoint || !this.chatAccessToken || this.historyBusy) return;
+    this.historyBusy = true;
+    try {
+      const data = await fetchJson(`${this.chatEndpoint.replace(/\/$/, "")}/chatapi/v1/history`, {
+        method: "POST",
+        headers: xChatHeaders(),
+        body: JSON.stringify({ access_token: this.chatAccessToken, room: this.broadcastId, limit: 100 }),
+      });
+      const entries = Array.isArray(data?.messages) ? data.messages : [];
+      const parsed = entries
+        .map((entry) => parseXChatFrame({ kind: entry?.kind ?? 1, payload: entry?.payload }))
+        .filter(Boolean)
+        .sort((a, b) => a.createdAt - b.createdAt);
+      for (const message of parsed) {
+        if (this.closed) return;
+        if (message.createdAt < this.startedAt - LIVE_BACKFILL_WINDOW_MS) continue;
+        if (this.seenChatIds?.has(this.chatIdKey(message))) continue;
+        this.rememberChatId(message);
+        emitMessage({ ...message, sourceId: this.sourceId, platform: "x" });
+      }
+    } catch {
+      // Transient — try again on the next tick.
+    } finally {
+      this.historyBusy = false;
+    }
   }
 
   scheduleReconnect() {
@@ -1479,6 +1540,8 @@ class XConnector {
     this.reconnectTimer = null;
     clearInterval(this.viewersTimer);
     this.viewersTimer = null;
+    clearInterval(this.historyTimer);
+    this.historyTimer = null;
     this.ws?.close();
     this.ws = null;
     emitStatus("x", "stopped", this.broadcastId, this.sourceId);
