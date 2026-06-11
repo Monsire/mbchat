@@ -62,6 +62,8 @@ Start a poll from the admin panel and **every connected chat votes together**:
 
 ![Poll results as a pie chart](docs/piechart.png)
 
+![Poll and chat on stream](docs/stream-chat-poll.png)
+
 ## 4. Viewer spotlight
 
 Put a chatter on stream with one click:
