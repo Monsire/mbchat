@@ -58,8 +58,6 @@ Every message is kept per user (up to 5,000 per source, in memory):
 - Click another message while a log is open to jump straight to that user
 - Logs power the spotlight feature — pin a user's history on stream
 
-![Viewer spotlight](docs/spotlight.png)
-
 ## 4. User info
 
 Click a chatter and get a clean popup card right where you clicked:
@@ -67,11 +65,21 @@ Click a chatter and get a clean popup card right where you clicked:
 - **Profile picture** (resolved live from Twitch/Kick), display name linking to their channel
 - Their **platform badges as real badge art** — subscriber, moderator, founder, etc.
 - The clicked message, quick access to their logs, and a **Spotlight** button
-- **Viewer spotlight**: pin a user and their message history on the stream overlay — the admin panel shows exactly what viewers see, and when the streamer scrolls the spotlight, **viewers' view scrolls in sync**
 
 ![User info popup](docs/userinfo.png)
 
-## 5. Tags & chat coloring
+## 5. Viewer spotlight
+
+Put a chatter on stream with one click:
+
+- Hit **Spotlight** on any user and their name, avatar, and full message history appear on the OBS overlay instantly
+- Messages are timestamped and keep updating live while the user is spotlighted
+- **Streamer-synced scrolling** — scroll the spotlight in the admin panel and every viewer's spotlight scrolls with you
+- The admin panel shows a live preview of exactly what viewers see, with a stop button
+
+![Viewer spotlight](docs/spotlight.png)
+
+## 6. Tags & chat coloring
 
 Make a busy multi-channel feed readable at a glance:
 
@@ -81,7 +89,7 @@ Make a busy multi-channel feed readable at a glance:
 
 ![Source tags and username colors](docs/tags-color.png)
 
-## 6. OBS integration
+## 7. OBS integration
 
 `/obschat` is built to be dropped into OBS as a browser source:
 
@@ -92,7 +100,7 @@ Make a busy multi-channel feed readable at a glance:
 
 ![Compact chat overlay](docs/stream-small-chat.png)
 
-## 7. Customisability
+## 8. Customisability
 
 The whole stream display is styled from the admin panel, live:
 
