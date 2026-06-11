@@ -19,8 +19,6 @@ npm start
 # http://localhost:4173
 ```
 
-![Watch page](docs/simple-site.png)
-
 ---
 
 ## 1. Cross-platform chat
