@@ -541,6 +541,7 @@ async function twitchGql(query) {
       "client-id": "kimne78kx3ncx6brgo4mv6wki5h1ko",
     },
     body: JSON.stringify({ query }),
+    signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) throw new Error(`Twitch GQL returned ${response.status}`);
   return response.json();
@@ -795,7 +796,9 @@ function buildTwitchParts(text, emoteTag, bttvEmotes) {
 }
 
 async function fetchJson(url, options = {}) {
-  const response = await fetch(url, options);
+  // Default timeout so a hung request can never stall a poll loop or
+  // reconnect path indefinitely.
+  const response = await fetch(url, { signal: AbortSignal.timeout(15_000), ...options });
   if (!response.ok) throw new Error(`${url} returned ${response.status}`);
   return response.json();
 }
@@ -892,6 +895,7 @@ async function resolveTwitchUserId(login) {
       "client-id": "kimne78kx3ncx6brgo4mv6wki5h1ko",
     },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15_000),
   });
 
   if (!response.ok) return "";
@@ -967,7 +971,7 @@ async function resolveYouTubeWatchUrl(input) {
   }
 
   for (const liveUrl of liveUrls) {
-    const response = await fetch(liveUrl, { headers: browserHeaders() });
+    const response = await fetch(liveUrl, { headers: browserHeaders(), signal: AbortSignal.timeout(20_000) });
     const html = await response.text();
     if (html.includes("/sorry/") || response.url.includes("/sorry/")) {
       throw new Error("YouTube rate limited this IP");
@@ -988,7 +992,7 @@ function youtubeLiveChatUrl(watchUrl) {
 }
 
 async function fetchYouTubeInitialPage(pageUrl) {
-  const response = await fetch(pageUrl, { headers: browserHeaders() });
+  const response = await fetch(pageUrl, { headers: browserHeaders(), signal: AbortSignal.timeout(20_000) });
   const html = await response.text();
 
   if (!response.ok) {
@@ -1462,18 +1466,36 @@ class XConnector {
     });
 
     ws.on("message", (buffer) => {
+      this.lastDataAt = Date.now();
       let frame;
       try {
         frame = JSON.parse(String(buffer));
       } catch {
         return;
       }
-      const message = parseXChatFrame(frame);
-      if (!message) return;
-      if (message.createdAt < this.startedAt - LIVE_BACKFILL_WINDOW_MS) return;
-      this.rememberChatId(message);
-      emitMessage({ ...message, sourceId: this.sourceId, platform: "x" });
+      try {
+        const message = parseXChatFrame(frame);
+        if (!message) return;
+        if (message.createdAt < this.startedAt - LIVE_BACKFILL_WINDOW_MS) return;
+        this.rememberChatId(message);
+        emitMessage({ ...message, sourceId: this.sourceId, platform: "x" });
+      } catch {
+        // One bad frame must not break the socket handler.
+      }
     });
+
+    // Liveness watchdog: live chatman rooms emit occupancy frames every few
+    // seconds, so a quiet socket is a dead socket — close it and let the
+    // reconnect path rebuild (history polling keeps chat flowing meanwhile).
+    this.lastDataAt = Date.now();
+    clearInterval(this.watchdogTimer);
+    this.watchdogTimer = setInterval(() => {
+      if (this.closed || this.ws !== ws) return;
+      if (Date.now() - this.lastDataAt > 120_000) {
+        emitStatus("x", "connecting", `${this.broadcastId} (stale socket)`, this.sourceId);
+        try { ws.terminate(); } catch { /* close handler reconnects */ }
+      }
+    }, 30_000);
 
     ws.on("error", (error) => emitStatus("x", "error", error.message, this.sourceId));
     ws.on("close", () => {
@@ -1522,16 +1544,19 @@ class XConnector {
     }
   }
 
-  scheduleReconnect() {
+  scheduleReconnect(delay = 3000) {
     if (this.closed || this.reconnectTimer) return;
     emitStatus("x", "connecting", `reconnecting ${this.broadcastId}`, this.sourceId);
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connect().catch((error) => {
         emitStatus("x", "error", error.message, this.sourceId);
-        if (!error.permanent) this.scheduleReconnect();
+        // Keep retrying — a failed reconnect must not strand the source in
+        // a dead state. Permanent failures (broadcast ended) retry slowly;
+        // refreshBroadcast picks up the channel's next live broadcast.
+        this.scheduleReconnect(error.permanent ? 60_000 : 30_000);
       });
-    }, 3000);
+    }, delay);
   }
 
   stop() {
@@ -1542,6 +1567,8 @@ class XConnector {
     this.viewersTimer = null;
     clearInterval(this.historyTimer);
     this.historyTimer = null;
+    clearInterval(this.watchdogTimer);
+    this.watchdogTimer = null;
     this.ws?.close();
     this.ws = null;
     emitStatus("x", "stopped", this.broadcastId, this.sourceId);
@@ -1573,16 +1600,26 @@ class TwitchConnector {
     if (!this.channel) throw new Error("missing Twitch channel");
     this.closed = false;
     emitStatus("twitch", "connecting", this.channel, this.sourceId);
-    await this.loadBttvEmotes();
+    // Emote/badge art must never block or fail the chat connection: await it
+    // only on first connect, refresh in the background on reconnects, and
+    // tolerate CDN failures either way (messages just render without art).
+    if (this.bttvEmotes.size || this.badgeMap.size) {
+      this.loadBttvEmotes().catch(() => {});
+    } else {
+      await this.loadBttvEmotes().catch(() => {});
+    }
+    if (this.closed) return;
 
     const nick = `justinfan${Math.floor(Math.random() * 80000 + 1000)}`;
-    this.ws = new WebSocket(TWITCH_IRC_URL);
+    const ws = new WebSocket(TWITCH_IRC_URL);
+    this.ws = ws;
+    this.lastDataAt = Date.now();
 
-    this.ws.on("open", () => {
-      this.ws.send("CAP REQ :twitch.tv/tags twitch.tv/commands");
-      this.ws.send("PASS SCHMOOPIIE");
-      this.ws.send(`NICK ${nick}`);
-      this.ws.send(`JOIN #${this.channel}`);
+    ws.on("open", () => {
+      ws.send("CAP REQ :twitch.tv/tags twitch.tv/commands");
+      ws.send("PASS SCHMOOPIIE");
+      ws.send(`NICK ${nick}`);
+      ws.send(`JOIN #${this.channel}`);
       emitStatus("twitch", "connected", this.channel, this.sourceId);
     });
 
@@ -1590,21 +1627,51 @@ class TwitchConnector {
     this.viewersTimer = setInterval(() => this.pollViewers(), 30_000);
     this.pollViewers();
 
-    this.ws.on("message", (buffer) => {
-      String(buffer).split("\r\n").filter(Boolean).forEach((line) => this.handleLine(line));
+    // Liveness watchdog: IRC sockets can die without a close event and sit
+    // "connected" forever. Ping when quiet; if Twitch stops answering,
+    // kill the socket so the close handler reconnects.
+    clearInterval(this.watchdogTimer);
+    this.watchdogTimer = setInterval(() => {
+      if (this.closed || this.ws !== ws) return;
+      const idle = Date.now() - this.lastDataAt;
+      if (idle > 140_000) {
+        emitStatus("twitch", "connecting", `${this.channel} (stale socket)`, this.sourceId);
+        try { ws.terminate(); } catch { /* close handler reconnects */ }
+      } else if (idle > 60_000 && ws.readyState === 1) {
+        ws.send("PING :keepalive");
+      }
+    }, 20_000);
+
+    ws.on("message", (buffer) => {
+      this.lastDataAt = Date.now();
+      String(buffer).split("\r\n").filter(Boolean).forEach((line) => {
+        // One malformed line must never take down the socket handler or
+        // drop the other lines in the same frame.
+        try {
+          this.handleLine(line);
+        } catch {
+          // Skip the bad line.
+        }
+      });
     });
 
     this.ws.on("error", (error) => emitStatus("twitch", "error", error.message, this.sourceId));
     this.ws.on("close", () => {
       if (this.closed) return;
       // Twitch periodically drops anonymous IRC connections — reconnect
-      // instead of staying dead until the next manual connect.
+      // instead of staying dead until the next manual connect, and keep
+      // retrying if a reconnect attempt itself fails.
       emitStatus("twitch", "disconnected", this.channel, this.sourceId);
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = setTimeout(() => {
+      const attemptReconnect = () => {
         if (this.closed) return;
-        this.start().catch((error) => emitStatus("twitch", "error", error.message, this.sourceId));
-      }, 3000);
+        this.start().catch((error) => {
+          emitStatus("twitch", "error", error.message, this.sourceId);
+          clearTimeout(this.reconnectTimer);
+          this.reconnectTimer = setTimeout(attemptReconnect, 15_000);
+        });
+      };
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = setTimeout(attemptReconnect, 3000);
     });
   }
 
@@ -1726,6 +1793,8 @@ class TwitchConnector {
     this.reconnectTimer = null;
     clearInterval(this.viewersTimer);
     this.viewersTimer = null;
+    clearInterval(this.watchdogTimer);
+    this.watchdogTimer = null;
     this.ws?.close();
     this.ws = null;
     emitStatus("twitch", "stopped", this.channel, this.sourceId);
@@ -1758,6 +1827,7 @@ class KickConnector {
     // the live status (its Disconnected event can fire after the direct
     // socket already reported "connected").
     connection.on(KickEvents.Connected, (state) => {
+      this.lastDataAt = Date.now();
       if (this.connection === connection) emitStatus("kick", "connected", `room ${state.roomID}`, this.sourceId);
     });
     connection.on(KickEvents.Disconnected, () => {
@@ -1766,10 +1836,22 @@ class KickConnector {
     connection.on(KickEvents.Error, (error) => {
       if (this.connection === connection) emitStatus("kick", "error", error?.message || String(error), this.sourceId);
     });
-    connection.on(KickEvents.ChatMessage, (message) => this.handleMessage(message));
-    connection.on(KickEvents.Subscription, (data) => this.handleSubscription(data));
-    connection.on(KickEvents.GiftedSubscriptions, (data) => this.handleGiftedSubscriptions(data));
-    connection.on(KickEvents.ViewerCount, (data) => emitViewers(this.sourceId, data?.viewers));
+    connection.on(KickEvents.ChatMessage, (message) => {
+      this.lastDataAt = Date.now();
+      try { this.handleMessage(message); } catch { /* skip bad payload */ }
+    });
+    connection.on(KickEvents.Subscription, (data) => {
+      this.lastDataAt = Date.now();
+      try { this.handleSubscription(data); } catch { /* skip bad payload */ }
+    });
+    connection.on(KickEvents.GiftedSubscriptions, (data) => {
+      this.lastDataAt = Date.now();
+      try { this.handleGiftedSubscriptions(data); } catch { /* skip bad payload */ }
+    });
+    connection.on(KickEvents.ViewerCount, (data) => {
+      this.lastDataAt = Date.now();
+      emitViewers(this.sourceId, data?.viewers);
+    });
 
     try {
       const status = await withTimeout(
@@ -1787,6 +1869,37 @@ class KickConnector {
       this.connection = null;
       await this.connectDirect();
     }
+
+    this.lastDataAt = Date.now();
+    this.startWatchdog();
+  }
+
+  // Liveness watchdog: both the library connection and the direct Pusher
+  // socket can die silently. Healthy connections produce regular traffic
+  // (viewer counts / pusher pings); prolonged silence means dead — tear
+  // down and reconnect rather than sit "connected" with no messages.
+  startWatchdog() {
+    clearInterval(this.watchdogTimer);
+    this.watchdogTimer = setInterval(() => {
+      if (this.closed) return;
+      const idle = Date.now() - (this.lastDataAt || 0);
+      if (this.ws) {
+        if (idle > 150_000) {
+          emitStatus("kick", "connecting", `${this.slug} (stale socket)`, this.sourceId);
+          try { this.ws.terminate(); } catch { /* close handler reopens */ }
+        } else if (idle > 75_000 && this.ws.readyState === 1) {
+          this.ws.send(JSON.stringify({ event: "pusher:ping", data: {} }));
+        }
+      } else if (idle > 240_000 && !this.restarting) {
+        this.restarting = true;
+        emitStatus("kick", "connecting", `${this.slug} (stale connection)`, this.sourceId);
+        try { this.connection.disconnect?.(); } catch { /* replaced below */ }
+        this.connection = null;
+        this.start()
+          .catch((error) => emitStatus("kick", "error", error.message, this.sourceId))
+          .finally(() => { this.restarting = false; });
+      }
+    }, 30_000);
   }
 
   async connectDirect() {
@@ -1807,6 +1920,7 @@ class KickConnector {
     });
 
     ws.on("message", (buffer) => {
+      this.lastDataAt = Date.now();
       let frame;
       try {
         frame = JSON.parse(String(buffer));
@@ -1826,9 +1940,13 @@ class KickConnector {
         }
       }
       const eventName = String(frame.event || "").split("\\").pop();
-      if (eventName === "ChatMessageEvent") this.handleMessage(payload);
-      else if (eventName === "SubscriptionEvent") this.handleSubscription(payload);
-      else if (eventName === "GiftedSubscriptionsEvent") this.handleGiftedSubscriptions(payload);
+      try {
+        if (eventName === "ChatMessageEvent") this.handleMessage(payload);
+        else if (eventName === "SubscriptionEvent") this.handleSubscription(payload);
+        else if (eventName === "GiftedSubscriptionsEvent") this.handleGiftedSubscriptions(payload);
+      } catch {
+        // One bad payload must not break the socket handler.
+      }
     });
 
     ws.on("error", (error) => emitStatus("kick", "error", error.message, this.sourceId));
@@ -1896,6 +2014,8 @@ class KickConnector {
 
   stop() {
     this.closed = true;
+    clearInterval(this.watchdogTimer);
+    this.watchdogTimer = null;
     this.connection?.stopViewerCountUpdates();
     this.connection?.disconnect();
     this.connection = null;
@@ -1925,6 +2045,7 @@ class YouTubeConnector {
         method: "POST",
         headers: browserHeaders({ "content-type": "application/json" }),
         body: JSON.stringify({ context: this.cfg.context, videoId }),
+        signal: AbortSignal.timeout(15_000),
       });
       const data = await response.json();
       const viewCount = findFirstByKey(data, "videoViewCountRenderer")?.viewCount;
@@ -2050,6 +2171,9 @@ class YouTubeConnector {
         },
         continuation: this.continuation,
       }),
+      // A hung poll must fail fast so the loop's recovery path can run
+      // instead of the connector sitting "connected" and silent.
+      signal: AbortSignal.timeout(20_000),
     });
 
     const body = await response.text();
