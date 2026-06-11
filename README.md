@@ -6,8 +6,6 @@
 
 mbchat is a self-hosted livestream chat aggregator: it merges live chat from **Twitch**, **Kick**, **YouTube**, and **X** into a single real-time feed, runs **cross-platform polls** that viewers vote on by just typing in their own chat, and ships an **OBS-ready stream overlay** whose look is controlled live from an admin panel.
 
-![Admin panel](docs/admin-dash.png)
-
 | Route | What it is |
 |---|---|
 | `/` | Admin panel — sources, polls, spotlight, stream display styling |
@@ -36,7 +34,7 @@ Four platforms, one feed, in real time:
 
 Every source shows a live connection state and its own **viewer count**, with a combined total across all platforms in the header. Messages carry their platform's icon so you always know where a message came from. Connections self-heal — drops reconnect automatically.
 
-![Compact chat overlay](docs/stream-small-chat.png)
+![Admin panel](docs/admin-dash.png)
 
 ## 2. Tags & chat coloring
 
@@ -95,6 +93,8 @@ Put a chatter on stream with one click:
 - Every styling change made in the admin panel **pushes to OBS live** — no refresh needed
 
 ![Combined chat on stream](docs/stream-chat.png)
+
+![Compact chat overlay](docs/stream-small-chat.png)
 
 ## 7. Customisability
 
