@@ -66,7 +66,7 @@ Click a chatter and get a clean popup card right where you clicked:
 - Their **platform badges as real badge art** — subscriber, moderator, founder, etc.
 - The clicked message, quick access to their logs, and a **Spotlight** button
 
-![User info popup](docs/userinfo.png)
+![User info popup](docs/userinfo.gif)
 
 ## 5. Viewer spotlight
 
@@ -77,7 +77,7 @@ Put a chatter on stream with one click:
 - **Streamer-synced scrolling** — scroll the spotlight in the admin panel and every viewer's spotlight scrolls with you
 - The admin panel shows a live preview of exactly what viewers see, with a stop button
 
-![Viewer spotlight](docs/spotlight.gif)
+![Viewer spotlight](docs/spotlight.png)
 
 ## 6. Tags & chat coloring
 
