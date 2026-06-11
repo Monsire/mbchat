@@ -77,7 +77,7 @@ Put a chatter on stream with one click:
 - **Streamer-synced scrolling** — scroll the spotlight in the admin panel and every viewer's spotlight scrolls with you
 - The admin panel shows a live preview of exactly what viewers see, with a stop button
 
-![Viewer spotlight](docs/spotlight.png)
+![Viewer spotlight](docs/spotlight.gif)
 
 ## 6. Tags & chat coloring
 
