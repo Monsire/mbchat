@@ -63,6 +63,9 @@ const messageLogs = new Map();
 const viewerCounts = new Map();
 
 function emitViewers(sourceId, count) {
+  // In-flight polls can resolve after a source was removed — don't let them
+  // resurrect a viewer-count entry for a dead source.
+  if (!activeSources.has(sourceId)) return;
   const value = Number.isFinite(Number(count)) ? Number(count) : null;
   viewerCounts.set(sourceId, value);
   broadcast("viewers", { sourceId, count: value });
@@ -1530,7 +1533,15 @@ class TwitchConnector {
 
     this.ws.on("error", (error) => emitStatus("twitch", "error", error.message, this.sourceId));
     this.ws.on("close", () => {
-      if (!this.closed) emitStatus("twitch", "disconnected", this.channel, this.sourceId);
+      if (this.closed) return;
+      // Twitch periodically drops anonymous IRC connections — reconnect
+      // instead of staying dead until the next manual connect.
+      emitStatus("twitch", "disconnected", this.channel, this.sourceId);
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = setTimeout(() => {
+        if (this.closed) return;
+        this.start().catch((error) => emitStatus("twitch", "error", error.message, this.sourceId));
+      }, 3000);
     });
   }
 
@@ -1648,6 +1659,8 @@ class TwitchConnector {
 
   stop() {
     this.closed = true;
+    clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
     clearInterval(this.viewersTimer);
     this.viewersTimer = null;
     this.ws?.close();
@@ -1674,16 +1687,26 @@ class KickConnector {
     this.startedAt = Date.now();
     emitStatus("kick", "connecting", this.slug, this.sourceId);
 
-    this.connection = new KickConnection(this.slug);
-    this.connection.on(KickEvents.Connected, (state) => emitStatus("kick", "connected", `room ${state.roomID}`, this.sourceId));
-    this.connection.on(KickEvents.Disconnected, () => {
-      if (!this.closed) emitStatus("kick", "disconnected", this.slug, this.sourceId);
+    const connection = new KickConnection(this.slug);
+    this.connection = connection;
+    // Guard every handler on `this.connection === connection`: when the
+    // offline fallback swaps to a direct chatroom socket, the abandoned
+    // library connection tears down asynchronously and must not clobber
+    // the live status (its Disconnected event can fire after the direct
+    // socket already reported "connected").
+    connection.on(KickEvents.Connected, (state) => {
+      if (this.connection === connection) emitStatus("kick", "connected", `room ${state.roomID}`, this.sourceId);
     });
-    this.connection.on(KickEvents.Error, (error) => emitStatus("kick", "error", error?.message || String(error), this.sourceId));
-    this.connection.on(KickEvents.ChatMessage, (message) => this.handleMessage(message));
-    this.connection.on(KickEvents.Subscription, (data) => this.handleSubscription(data));
-    this.connection.on(KickEvents.GiftedSubscriptions, (data) => this.handleGiftedSubscriptions(data));
-    this.connection.on(KickEvents.ViewerCount, (data) => emitViewers(this.sourceId, data?.viewers));
+    connection.on(KickEvents.Disconnected, () => {
+      if (!this.closed && this.connection === connection) emitStatus("kick", "disconnected", this.slug, this.sourceId);
+    });
+    connection.on(KickEvents.Error, (error) => {
+      if (this.connection === connection) emitStatus("kick", "error", error?.message || String(error), this.sourceId);
+    });
+    connection.on(KickEvents.ChatMessage, (message) => this.handleMessage(message));
+    connection.on(KickEvents.Subscription, (data) => this.handleSubscription(data));
+    connection.on(KickEvents.GiftedSubscriptions, (data) => this.handleGiftedSubscriptions(data));
+    connection.on(KickEvents.ViewerCount, (data) => emitViewers(this.sourceId, data?.viewers));
 
     try {
       const status = await withTimeout(
@@ -1907,13 +1930,28 @@ class YouTubeConnector {
       try {
         const { messages, nextContinuation, timeoutMs } = await this.pollOnce();
         const liveMessages = messages
-          .filter((message) => !message.createdAt || message.createdAt >= this.startedAt - LIVE_BACKFILL_WINDOW_MS);
-        if (liveMessages.length > 1) {
-          console.log(`[youtube:${this.sourceId}] received ${liveMessages.length} messages in one poll response`);
-        }
-        liveMessages.forEach((message) => emitMessage({ ...message, sourceId: this.sourceId }));
+          .filter((message) => !message.createdAt || message.createdAt >= this.startedAt - LIVE_BACKFILL_WINDOW_MS)
+          .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
         if (nextContinuation) this.continuation = nextContinuation;
-        await new Promise((resolve) => setTimeout(resolve, Math.max(timeoutMs || 2000, 1000)));
+
+        const waitMs = Math.max(timeoutMs || 2000, 1000);
+        if (!liveMessages.length) {
+          await new Promise((resolve) => setTimeout(resolve, waitMs));
+        } else {
+          // YouTube hands chat over in poll batches — drip the batch evenly
+          // across the poll window so messages read like a live stream
+          // instead of landing in chunks.
+          const gap = Math.min(Math.floor(waitMs / liveMessages.length), 900);
+          for (const message of liveMessages) {
+            if (this.stopped) return;
+            emitMessage({ ...message, sourceId: this.sourceId });
+            await new Promise((resolve) => setTimeout(resolve, gap));
+          }
+          const remaining = waitMs - gap * liveMessages.length;
+          if (remaining > 0) {
+            await new Promise((resolve) => setTimeout(resolve, remaining));
+          }
+        }
       } catch (error) {
         emitStatus("youtube", "error", error.message, this.sourceId);
         await new Promise((resolve) => setTimeout(resolve, 8000));
@@ -2090,6 +2128,15 @@ async function reconcileConnectors(sources) {
     }
   }
 
+  // Drop viewer counts that outlived their source (e.g. a poll that resolved
+  // mid-removal re-inserted the entry) so totals never include ghosts.
+  for (const sourceId of viewerCounts.keys()) {
+    if (!nextById.has(sourceId)) {
+      viewerCounts.delete(sourceId);
+      broadcast("viewers", { sourceId, count: null });
+    }
+  }
+
   for (const source of normalizedSources) {
     const currentSource = activeSources.get(source.id);
     const changed = !currentSource ||
@@ -2196,7 +2243,7 @@ function serveStatic(req, res) {
   });
 }
 
-const server = http.createServer(async (req, res) => {
+const handleRequest = async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
   if (req.method === "GET" && url.pathname === "/api/events") {
@@ -2204,6 +2251,9 @@ const server = http.createServer(async (req, res) => {
       "content-type": "text/event-stream",
       "cache-control": "no-cache",
       connection: "keep-alive",
+      // The stream is also served from a second port (different origin in
+      // the browser), so EventSource needs CORS to read it.
+      "access-control-allow-origin": "*",
     });
     clients.add(res);
     sendSSE(res, "ready", {
@@ -2361,8 +2411,25 @@ const server = http.createServer(async (req, res) => {
   }
 
   serveStatic(req, res);
-});
+};
+
+const server = http.createServer(handleRequest);
 
 server.listen(PORT, () => {
   console.log(`Chatbubble running at http://localhost:${PORT}`);
+});
+
+// Browsers cap HTTP/1.1 connections at 6 per origin, and every open tab
+// holds one for its SSE stream — enough tabs and page loads stall forever.
+// Serving the same app on a second port gives the long-lived streams their
+// own connection budget; pages load from PORT, streams attach here.
+const EVENTS_PORT = Number(process.env.EVENTS_PORT || PORT + 1);
+const eventsServer = http.createServer(handleRequest);
+
+eventsServer.on("error", (error) => {
+  console.error(`events port ${EVENTS_PORT} unavailable (${error.code}); streams will share ${PORT}`);
+});
+
+eventsServer.listen(EVENTS_PORT, () => {
+  console.log(`Event stream also on http://localhost:${EVENTS_PORT}`);
 });

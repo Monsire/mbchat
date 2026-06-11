@@ -344,7 +344,12 @@ function renderSourceStates() {
 function renderSourcesTotal() {
   const total = document.querySelector("#sources-total");
   if (!total) return;
-  const counts = Object.values(viewers).filter((value) => Number.isFinite(value));
+  const rowIds = new Set(
+    Array.from(sourceList.querySelectorAll(".source-row")).map((row) => row.dataset.sourceId),
+  );
+  const counts = Object.entries(viewers)
+    .filter(([sourceId, value]) => rowIds.has(sourceId) && Number.isFinite(value))
+    .map(([, value]) => value);
   total.textContent = counts.length
     ? `${formatViewers(counts.reduce((sum, value) => sum + value, 0))} watching`
     : "";
@@ -1024,9 +1029,29 @@ function statusArrayToMap(statusArray = []) {
   return next;
 }
 
+// Long-lived SSE streams get a dedicated port so they don't exhaust the
+// browser's 6-connections-per-origin budget and stall page loads.
+let eventStreamOpened = false;
+let useSameOriginEvents = false;
+
+function eventStreamUrl() {
+  const { protocol, hostname, port } = window.location;
+  if (useSameOriginEvents || !protocol.startsWith("http") || !port) return "/api/events";
+  return `${protocol}//${hostname}:${Number(port) + 1}/api/events`;
+}
+
 function connectEventStream() {
   if (eventSource) eventSource.close();
-  eventSource = new EventSource("/api/events");
+  eventSource = new EventSource(eventStreamUrl());
+  eventSource.onopen = () => {
+    eventStreamOpened = true;
+  };
+  eventSource.onerror = () => {
+    if (!eventStreamOpened && !useSameOriginEvents) {
+      useSameOriginEvents = true;
+      connectEventStream();
+    }
+  };
 
   eventSource.addEventListener("ready", (event) => {
     const data = JSON.parse(event.data);

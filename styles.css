@@ -476,6 +476,7 @@ h1 {
 
 .source-state.connected,
 .source-state.connecting,
+.source-state.disconnected,
 .source-state.error {
   display: flex;
 }
@@ -506,6 +507,7 @@ h1 {
   color: var(--muted);
 }
 
+.source-state.disconnected,
 .source-state.error {
   color: var(--danger);
 }
@@ -549,16 +551,17 @@ input::placeholder {
 .chat-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   height: 52px;
   padding: 0 16px;
   border-bottom: 1px solid var(--paper);
   color: var(--ink);
   background: var(--surface);
   font-family: var(--serif);
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 900;
   letter-spacing: 0.04em;
+  text-align: center;
   text-transform: uppercase;
 }
 
@@ -1670,15 +1673,16 @@ body.embed {
 
 .obs-chat-bar {
   flex: 0 0 auto;
-  padding: 0.45em 0.8em;
+  padding: 0.12em 0.8em;
   border: var(--obs-border, 2px) solid var(--paper);
   border-bottom: 0;
   color: var(--ink);
   background: var(--surface);
   font-family: var(--serif);
-  font-size: var(--obs-font-size, 18px);
-  font-weight: 700;
+  font-size: calc(var(--obs-font-size, 18px) + 8px);
+  font-weight: 900;
   letter-spacing: 0.04em;
+  text-align: center;
   text-transform: uppercase;
 }
 
