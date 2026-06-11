@@ -36,7 +36,7 @@ Four platforms, one feed, in real time:
 
 Every source shows a live connection state and its own **viewer count**, with a combined total across all platforms in the header. Messages carry their platform's icon so you always know where a message came from. Connections self-heal — drops reconnect automatically.
 
-![Combined chat on stream](docs/stream-chat.png)
+![Compact chat overlay](docs/stream-small-chat.png)
 
 ## 2. Tags & chat coloring
 
@@ -94,7 +94,7 @@ Put a chatter on stream with one click:
 - Chat title bar with an on/off toggle
 - Every styling change made in the admin panel **pushes to OBS live** — no refresh needed
 
-![Compact chat overlay](docs/stream-small-chat.png)
+![Combined chat on stream](docs/stream-chat.png)
 
 ## 7. Customisability
 
