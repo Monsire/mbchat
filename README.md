@@ -38,7 +38,17 @@ Every source shows a live connection state and its own **viewer count**, with a 
 
 ![Combined chat on stream](docs/stream-chat.png)
 
-## 2. User info & chat logs
+## 2. Tags & chat coloring
+
+Make a busy multi-channel feed readable at a glance:
+
+- Per-source **labels** — tag each connected chat (e.g. "main", "co-stream") and the tag rides along on every message
+- Per-source **username colors** via a custom color picker
+- Platform events — **subs, gift subs, super chats, memberships, bits** — render as styled event cards with uppercase tags, separated from regular chat
+
+![Source tags and username colors](docs/tags-color.png)
+
+## 3. User info & chat logs
 
 Click a chatter and get a clean popup card right where you clicked:
 
@@ -50,7 +60,7 @@ Click a chatter and get a clean popup card right where you clicked:
 
 ![User info popup](docs/userinfo.gif)
 
-## 3. Cross-chat polls
+## 4. Cross-chat polls
 
 Start a poll from the admin panel and **every connected chat votes together**:
 
@@ -64,7 +74,7 @@ Start a poll from the admin panel and **every connected chat votes together**:
 
 ![Poll and chat on stream](docs/stream-chat-poll.png)
 
-## 4. Viewer spotlight
+## 5. Viewer spotlight
 
 Put a chatter on stream with one click:
 
@@ -74,16 +84,6 @@ Put a chatter on stream with one click:
 - The admin panel shows a live preview of exactly what viewers see, with a stop button
 
 ![Viewer spotlight](docs/spotlight.png)
-
-## 5. Tags & chat coloring
-
-Make a busy multi-channel feed readable at a glance:
-
-- Per-source **labels** — tag each connected chat (e.g. "main", "co-stream") and the tag rides along on every message
-- Per-source **username colors** via a custom color picker
-- Platform events — **subs, gift subs, super chats, memberships, bits** — render as styled event cards with uppercase tags, separated from regular chat
-
-![Source tags and username colors](docs/tags-color.png)
 
 ## 6. OBS integration
 
